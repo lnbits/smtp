@@ -1,0 +1,9 @@
+{
+    "repos": [
+        {
+            "id": "smtp",
+            "organisation": "dni",
+            "repository": "lnbits-smtp-extension"
+        }
+    ]
+}

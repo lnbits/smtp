@@ -12,7 +12,6 @@ db = Database("ext_smtp")
 smtp_static_files = [
     {
         "path": "/smtp/static",
-        "app": StaticFiles(directory="lnbits/extensions/smtp/static"),
         "name": "smtp_static",
     }
 ]
@@ -21,7 +20,7 @@ smtp_ext: APIRouter = APIRouter(prefix="/smtp", tags=["smtp"])
 
 
 def smtp_renderer():
-    return template_renderer(["lnbits/extensions/smtp/templates"])
+    return template_renderer(["smtp/templates"])
 
 
 from .tasks import wait_for_paid_invoices

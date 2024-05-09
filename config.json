@@ -1,7 +1,31 @@
 {
     "name": "SMTP",
-    "contributors": ["dni"],
     "short_description": "Charge sats for sending emails",
     "tile": "/smtp/static/smtp-bitcoin-email.png",
-    "min_lnbits_version": "0.11.0"
+    "min_lnbits_version": "0.11.0",
+    "contributors": [
+        {
+          "name": "dni",
+          "uri": "https://github.com/dni",
+          "role": "Developer"
+        },
+        {
+          "name": "prusnak",
+          "uri": "https://github.com/prusnak",
+          "role": "Developer"
+        },
+        {
+          "name": "bitkarrot",
+          "uri": "https://github.com/bitkarrot",
+          "role": "Developer"
+        }
+      ],
+      "images": [
+        {
+          "uri": "https://raw.githubusercontent.com/lnbits/smtp/main/static/1.png"
+        }
+      ],
+      "description_md": "https://raw.githubusercontent.com/lnbits/smtp/main/description.md",
+      "terms_and_conditions_md": "https://raw.githubusercontent.com/lnbits/smtp/main/toc.md",
+      "license": "MIT"
 }

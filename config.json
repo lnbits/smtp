@@ -3,5 +3,5 @@
     "contributors": ["dni"],
     "short_description": "Charge sats for sending emails",
     "tile": "/smtp/static/smtp-bitcoin-email.png",
-    "min_lnbits_version": "0.11.0"
+    "min_lnbits_version": "0.12.5"
 }

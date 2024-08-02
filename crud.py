@@ -1,17 +1,19 @@
 from typing import List, Optional, Union
 
+from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
 
-from . import db
 from .models import CreateEmail, CreateEmailaddress, Email, Emailaddress
 from .smtp import send_mail
+
+db = Database("ext_smtp")
 
 
 def get_test_mail(email, testemail):
     return CreateEmail(
         emailaddress_id=email,
         subject="LNBits SMTP - Test Email",
-        message="This is a test email from the LNBits SMTP extension! email is working!",
+        message="This is a test email from the LNBits SMTP extension! email working!",
         receiver=testemail,
     )
 
@@ -26,7 +28,11 @@ async def create_emailaddress(data: CreateEmailaddress) -> Emailaddress:
 
     await db.execute(
         """
-        INSERT INTO smtp.emailaddress (id, wallet, email, testemail, smtp_server, smtp_user, smtp_password, smtp_port, anonymize, description, cost)
+        INSERT INTO smtp.emailaddress
+        (
+            id, wallet, email, testemail, smtp_server, smtp_user, smtp_password,
+            smtp_port, anonymize, description, cost
+        )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
@@ -96,14 +102,15 @@ async def delete_emailaddress(emailaddress_id: str) -> None:
 
 
 async def create_email(wallet: str, data: CreateEmail, payment_hash: str = "") -> Email:
-    id = urlsafe_short_hash()
+    email_id = urlsafe_short_hash()
     await db.execute(
         """
-        INSERT INTO smtp.email (id, payment_hash, wallet, emailaddress_id, subject, receiver, message, paid)
+        INSERT INTO smtp.email
+        (id, payment_hash, wallet, emailaddress_id, subject, receiver, message, paid)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            id,
+            email_id,
             payment_hash,
             wallet,
             data.emailaddress_id,
@@ -114,7 +121,7 @@ async def create_email(wallet: str, data: CreateEmail, payment_hash: str = "") -
         ),
     )
 
-    new_email = await get_email(id)
+    new_email = await get_email(email_id)
     assert new_email, "Newly created email couldn't be retrieved"
     return new_email
 
@@ -136,8 +143,8 @@ async def get_email_by_payment_hash(payment_hash: str) -> Optional[Email]:
     return Email(**row) if row else None
 
 
-async def get_email(id: str) -> Optional[Email]:
-    row = await db.fetchone("SELECT * FROM smtp.email WHERE id = ?", (id,))
+async def get_email(email_id: str) -> Optional[Email]:
+    row = await db.fetchone("SELECT * FROM smtp.email WHERE id = ?", (email_id,))
     return Email(**row) if row else None
 
 
@@ -147,7 +154,10 @@ async def get_emails(wallet_ids: Union[str, List[str]]) -> List[Email]:
 
     q = ",".join(["?"] * len(wallet_ids))
     rows = await db.fetchall(
-        f"SELECT s.*, d.email as emailaddress FROM smtp.email s INNER JOIN smtp.emailaddress d ON (s.emailaddress_id = d.id) WHERE s.wallet IN ({q})",
+        f"""
+    SELECT s.*, d.email as emailaddress FROM smtp.email s
+    INNER JOIN smtp.emailaddress d ON (s.emailaddress_id = d.id) WHERE s.wallet IN ({q})
+    """,
         (*wallet_ids,),
     )
 

@@ -1,13 +1,12 @@
 import asyncio
 
-from loguru import logger
 from fastapi import APIRouter
+from loguru import logger
 
-from lnbits.db import Database
-from lnbits.helpers import template_renderer
-from lnbits.tasks import create_permanent_unique_task
-
-db = Database("ext_smtp")
+from .crud import db
+from .tasks import wait_for_paid_invoices
+from .views import smtp_generic_router
+from .views_api import smtp_api_router
 
 smtp_static_files = [
     {
@@ -17,18 +16,11 @@ smtp_static_files = [
 ]
 
 smtp_ext: APIRouter = APIRouter(prefix="/smtp", tags=["smtp"])
-
-
-def smtp_renderer():
-    return template_renderer(["smtp/templates"])
-
-
-from .tasks import wait_for_paid_invoices
-from .views import *  # noqa: F401,F403
-from .views_api import *  # noqa: F401,F403
-
+smtp_ext.include_router(smtp_generic_router)
+smtp_ext.include_router(smtp_api_router)
 
 scheduled_tasks: list[asyncio.Task] = []
+
 
 def smtp_stop():
     for task in scheduled_tasks:
@@ -37,6 +29,12 @@ def smtp_stop():
         except Exception as ex:
             logger.warning(ex)
 
+
 def smtp_start():
+    from lnbits.tasks import create_permanent_unique_task
+
     task = create_permanent_unique_task("ext_smtp", wait_for_paid_invoices)
     scheduled_tasks.append(task)
+
+
+__all__ = ["db", "smtp_ext", "smtp_static_files", "smtp_start", "smtp_stop"]

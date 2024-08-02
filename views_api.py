@@ -1,12 +1,11 @@
 from http import HTTPStatus
 
-from fastapi import Depends, HTTPException, Query
-
+from fastapi import APIRouter, Depends, HTTPException, Query
 from lnbits.core.crud import get_user
+from lnbits.core.models import WalletTypeInfo
 from lnbits.core.services import check_transaction_status, create_invoice
-from lnbits.decorators import WalletTypeInfo, get_key_type, require_admin_key
+from lnbits.decorators import get_key_type, require_admin_key
 
-from . import smtp_ext
 from .crud import (
     create_email,
     create_emailaddress,
@@ -22,9 +21,11 @@ from .crud import (
 from .models import CreateEmail, CreateEmailaddress
 from .smtp import send_mail, valid_email
 
+smtp_api_router = APIRouter()
+
 
 ## EMAILS
-@smtp_ext.get("/api/v1/email")
+@smtp_api_router.get("/api/v1/email")
 async def api_email(
     g: WalletTypeInfo = Depends(get_key_type), all_wallets: bool = Query(False)
 ):
@@ -36,7 +37,7 @@ async def api_email(
     return [email.dict() for email in await get_emails(wallet_ids)]
 
 
-@smtp_ext.get("/api/v1/email/{payment_hash}")
+@smtp_api_router.get("/api/v1/email/{payment_hash}")
 async def api_smtp_send_email(payment_hash):
     email = await get_email_by_payment_hash(payment_hash)
     if not email:
@@ -59,7 +60,7 @@ async def api_smtp_send_email(payment_hash):
     return {"paid": False}
 
 
-@smtp_ext.post("/api/v1/email/{emailaddress_id}")
+@smtp_api_router.post("/api/v1/email/{emailaddress_id}")
 async def api_smtp_make_email(emailaddress_id, data: CreateEmail):
     valid_email(data.receiver)
 
@@ -80,8 +81,10 @@ async def api_smtp_make_email(emailaddress_id, data: CreateEmail):
             memo=memo,
             extra={"tag": "smtp"},
         )
-    except Exception as e:
-        raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(e))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc)
+        ) from exc
 
     email = await create_email(
         payment_hash=payment_hash, wallet=emailaddress.wallet, data=data
@@ -94,7 +97,7 @@ async def api_smtp_make_email(emailaddress_id, data: CreateEmail):
     return {"payment_hash": payment_hash, "payment_request": payment_request}
 
 
-@smtp_ext.post(
+@smtp_api_router.post(
     "/api/v1/email/{emailaddress_id}/send", dependencies=[Depends(require_admin_key)]
 )
 async def api_smtp_make_email_send(emailaddress_id, data: CreateEmail):
@@ -114,7 +117,7 @@ async def api_smtp_make_email_send(emailaddress_id, data: CreateEmail):
     return {"sent": True}
 
 
-@smtp_ext.delete("/api/v1/email/{email_id}")
+@smtp_api_router.delete("/api/v1/email/{email_id}")
 async def api_email_delete(email_id, g: WalletTypeInfo = Depends(get_key_type)):
     email = await get_email(email_id)
 
@@ -131,7 +134,7 @@ async def api_email_delete(email_id, g: WalletTypeInfo = Depends(get_key_type)):
 
 
 ## EMAILADDRESSES
-@smtp_ext.get("/api/v1/emailaddress")
+@smtp_api_router.get("/api/v1/emailaddress")
 async def api_emailaddresses(
     g: WalletTypeInfo = Depends(get_key_type),
     all_wallets: bool = Query(False),
@@ -146,8 +149,8 @@ async def api_emailaddresses(
     ]
 
 
-@smtp_ext.post("/api/v1/emailaddress")
-@smtp_ext.put("/api/v1/emailaddress/{emailaddress_id}")
+@smtp_api_router.post("/api/v1/emailaddress")
+@smtp_api_router.put("/api/v1/emailaddress/{emailaddress_id}")
 async def api_emailaddress_create(
     data: CreateEmailaddress,
     emailaddress_id=None,
@@ -171,7 +174,7 @@ async def api_emailaddress_create(
     return emailaddress.dict()
 
 
-@smtp_ext.delete("/api/v1/emailaddress/{emailaddress_id}")
+@smtp_api_router.delete("/api/v1/emailaddress/{emailaddress_id}")
 async def api_emailaddress_delete(
     emailaddress_id, g: WalletTypeInfo = Depends(get_key_type)
 ):

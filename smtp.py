@@ -1,5 +1,4 @@
 import re
-import socket
 import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -23,7 +22,10 @@ async def send_mail(
 
 def valid_email(s):
     # https://regexr.com/2rhq7
-    pat = r"[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
+    pat = r"""
+    [a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@
+    (?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?
+    """
     if re.match(pat, s):
         return True
     log = f"SMTP - invalid email: {s}."
@@ -86,25 +88,27 @@ class SmtpService:
             conn = SMTP(host=self.smtp_server, port=int(self.smtp_port), timeout=10)
             logger.debug("SMTP - connected to smtp server.")
             # conn.set_debuglevel(True)
-        except:
-            log = f"SMTP - error connecting to smtp server: {self.smtp_server}:{self.smtp_port}."
+        except Exception as exc:
+            log = f"""
+            SMTP - error connecting to smtp server: {self.smtp_server}:{self.smtp_port}.
+            """
             logger.debug(log)
-            raise Exception(log)
+            raise Exception(log) from exc
 
         try:
             conn.login(self.smtp_user, self.smtp_password)
             logger.debug("SMTP - successful login to smtp server.")
-        except:
+        except Exception as exc:
             log = f"SMTP - error login into smtp {self.smtp_user}."
             logger.error(log)
-            raise Exception(log)
+            raise Exception(log) from exc
 
         try:
             conn.sendmail(self.sender, receiver, msg.as_string())
             logger.debug("SMTP - successfully send email.")
-        except socket.error as e:
-            log = f"SMTP - error sending email: {str(e)}."
+        except OSError as exc:
+            log = f"SMTP - error sending email: {exc!s}."
             logger.error(log)
-            raise Exception(log)
+            raise Exception(log) from exc
         finally:
             conn.quit()

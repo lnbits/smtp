@@ -1,9 +1,8 @@
 import asyncio
 
-from loguru import logger
-
 from lnbits.core.models import Payment
 from lnbits.tasks import register_invoice_listener
+from loguru import logger
 
 from .crud import get_email_by_payment_hash, get_emailaddress, set_email_paid
 from .smtp import send_mail

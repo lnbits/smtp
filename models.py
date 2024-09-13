@@ -43,5 +43,6 @@ class Email(BaseModel):
     subject: str
     receiver: str
     message: str
-    paid: bool
     time: int
+    payment_hash: str
+    paid: bool = False

@@ -30,6 +30,5 @@ async def on_invoice_paid(payment: Payment) -> None:
         logger.error("SMTP: emailaddress can not by fetched")
         return
 
-    await payment.set_pending(False)
     await send_mail(emailaddress, email)
     await set_email_paid(payment_hash=payment.payment_hash)

@@ -29,18 +29,20 @@
         <q-table
           dense
           flat
-          :data="emailaddresses"
+          :rows="emailaddresses"
           row-key="id"
           :columns="emailaddressTable.columns"
-          :pagination.sync="emailaddressTable.pagination"
+          v-model:pagination="emailaddressTable.pagination"
         >
-          {% raw %}
           <template v-slot:header="props">
             <q-tr :props="props">
               <q-th auto-width></q-th>
-              <q-th v-for="col in props.cols" :key="col.name" :props="props">
-                {{ col.label }}
-              </q-th>
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                v-text="col.label"
+              ></q-th>
               <q-th auto-width></q-th>
             </q-tr>
           </template>
@@ -66,9 +68,12 @@
                   @click="showEmailDialog(props.row.id)"
                 ></q-btn>
               </q-td>
-              <q-td v-for="col in props.cols" :key="col.name" :props="props">
-                {{ col.value }}
-              </q-td>
+              <q-td
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                v-text="col.value"
+              ></q-td>
               <q-td auto-width>
                 <q-btn
                   flat
@@ -92,7 +97,6 @@
               </q-td>
             </q-tr>
           </template>
-          {% endraw %}
         </q-table>
       </q-card-section>
     </q-card>
@@ -112,25 +116,30 @@
         <q-table
           dense
           flat
-          :data="emails"
+          :rows="emails"
           row-key="id"
           :columns="emailsTable.columns"
-          :pagination.sync="emailsTable.pagination"
+          v-model:pagination="emailsTable.pagination"
         >
-          {% raw %}
           <template v-slot:header="props">
             <q-tr :props="props">
-              <q-th v-for="col in props.cols" :key="col.name" :props="props">
-                {{ col.label }}
-              </q-th>
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                v-text="col.label"
+              ></q-th>
               <q-th auto-width></q-th>
             </q-tr>
           </template>
           <template v-slot:body="props">
             <q-tr :props="props">
-              <q-td v-for="col in props.cols" :key="col.name" :props="props">
-                {{ col.value }}
-              </q-td>
+              <q-td
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                v-text="col.value"
+              ></q-td>
               <q-td auto-width>
                 <q-btn
                   flat
@@ -143,7 +152,6 @@
               </q-td>
             </q-tr>
           </template>
-          {% endraw %}
         </q-table>
       </q-card-section>
     </q-card>
@@ -308,8 +316,8 @@
 
 {% endblock %} {% block scripts %} {{ window_vars(user) }}
 <script>
-  var LNSendmail = function (obj) {
-    obj.date = Quasar.utils.date.formatDate(
+  const LNSendmail = obj => {
+    obj.date = Quasar.date.formatDate(
       new Date(obj.time * 1000),
       'YYYY-MM-DD HH:mm'
     )
@@ -320,7 +328,7 @@
   new Vue({
     el: '#vue',
     mixins: [windowMixin],
-    data: function () {
+    data() {
       return {
         emailaddresses: [],
         emails: [],
@@ -405,7 +413,7 @@
       }
     },
     methods: {
-      enableButton: function () {
+      enableButton() {
         return (
           this.emailaddressDialog.data.cost == null ||
           this.emailaddressDialog.data.cost < 0 ||
@@ -418,68 +426,61 @@
           this.emailaddressDialog.data.description == null
         )
       },
-      getEmails: function () {
-        var self = this
-
+      getEmails() {
         LNbits.api
           .request(
             'GET',
             '/smtp/api/v1/email?all_wallets=true',
             this.g.user.wallets[0].inkey
           )
-          .then(function (response) {
-            self.emails = response.data.map(function (obj) {
+          .then(response => {
+            this.emails = response.data.map(function (obj) {
               return LNSendmail(obj)
             })
           })
       },
-      deleteEmail: function (emailId) {
-        var self = this
-        var email = _.findWhere(this.emails, {id: emailId})
+      deleteEmail(emailId) {
+        const email = _.findWhere(this.emails, {id: emailId})
 
         LNbits.utils
           .confirmDialog('Are you sure you want to delete this email')
-          .onOk(function () {
+          .onOk(() => {
             LNbits.api
               .request(
                 'DELETE',
                 '/smtp/api/v1/email/' + emailId,
-                _.findWhere(self.g.user.wallets, {id: email.wallet}).inkey
+                _.findWhere(this.g.user.wallets, {id: email.wallet}).inkey
               )
-              .then(function (response) {
-                self.emails = _.reject(self.emails, function (obj) {
+              .then(response => {
+                this.emails = _.reject(this.emails, function (obj) {
                   return obj.id == emailId
                 })
               })
-              .catch(function (error) {
-                LNbits.utils.notifyApiError(error)
-              })
+              .catch(LNbits.utils.notifyApiError)
           })
       },
-      exportEmailsCSV: function () {
+      exportEmailsCSV() {
         LNbits.utils.exportCSV(this.emailsTable.columns, this.emails)
       },
 
-      getEmailAddresses: function () {
-        var self = this
-
+      getEmailAddresses() {
         LNbits.api
           .request(
             'GET',
             '/smtp/api/v1/emailaddress?all_wallets=true',
             this.g.user.wallets[0].inkey
           )
-          .then(function (response) {
-            self.emailaddresses = response.data.map(function (obj) {
+          .then(response => {
+            this.emailaddresses = response.data.map(function (obj) {
               return LNSendmail(obj)
             })
           })
       },
-      sendFormData: function () {
-        var wallet = _.findWhere(this.g.user.wallets, {
+      sendFormData() {
+        const wallet = _.findWhere(this.g.user.wallets, {
           id: this.emailaddressDialog.data.wallet
         })
-        var data = this.emailaddressDialog.data
+        const data = this.emailaddressDialog.data
         if (data.id) {
           this.updateEmailaddress(wallet, data)
         } else {
@@ -487,26 +488,21 @@
         }
       },
 
-      createEmailaddress: function (wallet, data) {
-        var self = this
-
+      createEmailaddress(wallet, data) {
         LNbits.api
           .request('POST', '/smtp/api/v1/emailaddress', wallet.inkey, data)
-          .then(function (response) {
-            self.emailaddresses.push(LNSendmail(response.data))
-            self.emailaddressDialog.show = false
-            self.emailaddressDialog.data = {}
+          .then(response => {
+            this.emailaddresses.push(LNSendmail(response.data))
+            this.emailaddressDialog.show = false
+            this.emailaddressDialog.data = {}
           })
-          .catch(function (error) {
-            LNbits.utils.notifyApiError(error)
-          })
+          .catch(LNbits.utils.notifyApiError)
       },
-      sendEmail: function () {
-        var self = this
-        var emailaddress = _.findWhere(this.emailaddresses, {
-          id: self.emailDialog.data.emailaddress_id
+      sendEmail() {
+        const emailaddress = _.findWhere(this.emailaddresses, {
+          id: this.emailDialog.data.emailaddress_id
         })
-        var wallet = _.findWhere(this.g.user.wallets, {
+        const wallet = _.findWhere(this.g.user.wallets, {
           id: emailaddress.wallet
         })
         LNbits.api
@@ -514,28 +510,24 @@
             'POST',
             '/smtp/api/v1/email/' + emailaddress.id + '/send',
             wallet.adminkey,
-            self.emailDialog.data
+            this.emailDialog.data
           )
-          .then(function (response) {
-            self.emailDialog.show = false
-            self.emailDialog.data = {}
+          .then(response => {
+            this.emailDialog.show = false
+            this.emailDialog.data = {}
           })
-          .catch(function (error) {
-            LNbits.utils.notifyApiError(error)
-          })
+          .catch(LNbits.utils.notifyApiError)
       },
-      showEmailDialog: function (emailaddress_id) {
+      showEmailDialog(emailaddress_id) {
         this.emailDialog.data.emailaddress_id = emailaddress_id
         this.emailDialog.show = true
       },
-      updateEmailaddressDialog: function (formId) {
-        var link = _.findWhere(this.emailaddresses, {id: formId})
+      updateEmailaddressDialog(formId) {
+        const link = _.findWhere(this.emailaddresses, {id: formId})
         this.emailaddressDialog.data = _.clone(link)
         this.emailaddressDialog.show = true
       },
-      updateEmailaddress: function (wallet, data) {
-        var self = this
-
+      updateEmailaddress(wallet, data) {
         LNbits.api
           .request(
             'PUT',
@@ -543,21 +535,18 @@
             wallet.inkey,
             data
           )
-          .then(function (response) {
-            self.emailaddresses = _.reject(self.emailaddresses, function (obj) {
+          .then(response => {
+            this.emailaddresses = _.reject(this.emailaddresses, function (obj) {
               return obj.id == data.id
             })
-            self.emailaddresses.push(LNSendmail(response.data))
-            self.emailaddressDialog.show = false
-            self.emailaddressDialog.data = {}
+            this.emailaddresses.push(LNSendmail(response.data))
+            this.emailaddressDialog.show = false
+            this.emailaddressDialog.data = {}
           })
-          .catch(function (error) {
-            LNbits.utils.notifyApiError(error)
-          })
+          .catch(LNbits.utils.notifyApiError)
       },
-      deleteEmailaddress: function (emailaddressId) {
-        var self = this
-        var emailaddresses = _.findWhere(this.emailaddresses, {
+      deleteEmailaddress(emailaddressId) {
+        const emailaddresses = _.findWhere(this.emailaddresses, {
           id: emailaddressId
         })
 
@@ -565,35 +554,33 @@
           .confirmDialog(
             'Are you sure you want to delete this emailaddress link?'
           )
-          .onOk(function () {
+          .onOk(() => {
             LNbits.api
               .request(
                 'DELETE',
                 '/smtp/api/v1/emailaddress/' + emailaddressId,
-                _.findWhere(self.g.user.wallets, {id: emailaddresses.wallet})
+                _.findWhere(this.g.user.wallets, {id: emailaddresses.wallet})
                   .inkey
               )
-              .then(function (response) {
-                self.emailaddresses = _.reject(
-                  self.emailaddresses,
+              .then(response => {
+                this.emailaddresses = _.reject(
+                  this.emailaddresses,
                   function (obj) {
                     return obj.id == emailaddressId
                   }
                 )
               })
-              .catch(function (error) {
-                LNbits.utils.notifyApiError(error)
-              })
+              .catch(LNbits.utils.notifyApiError)
           })
       },
-      exportEmailaddressesCSV: function () {
+      exportEmailaddressesCSV() {
         LNbits.utils.exportCSV(
           this.emailaddressTable.columns,
           this.emailaddresses
         )
       }
     },
-    created: function () {
+    created() {
       if (this.g.user.wallets.length) {
         this.getEmailAddresses()
         this.getEmails()
@@ -601,4 +588,4 @@
     }
   })
 </script>
-{% endblock %}
+{% endblock %

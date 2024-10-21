@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from lnbits.core.crud import get_user
 from lnbits.core.models import WalletTypeInfo
 from lnbits.core.services import check_transaction_status, create_invoice
-from lnbits.decorators import get_key_type, require_admin_key
+from lnbits.decorators import require_admin_key, require_invoice_key
 
 from .crud import (
     create_email,
@@ -18,7 +18,7 @@ from .crud import (
     get_emails,
     update_emailaddress,
 )
-from .models import CreateEmail, CreateEmailaddress
+from .models import CreateEmail, CreateEmailaddress, Email, Emailaddress
 from .smtp import send_mail, valid_email
 
 smtp_api_router = APIRouter()
@@ -27,14 +27,15 @@ smtp_api_router = APIRouter()
 ## EMAILS
 @smtp_api_router.get("/api/v1/email")
 async def api_email(
-    g: WalletTypeInfo = Depends(get_key_type), all_wallets: bool = Query(False)
-):
-    wallet_ids = [g.wallet.id]
+    key_info: WalletTypeInfo = Depends(require_invoice_key),
+    all_wallets: bool = Query(False),
+) -> list[Email]:
+    wallet_ids = [key_info.wallet.id]
     if all_wallets:
-        user = await get_user(g.wallet.user)
+        user = await get_user(key_info.wallet.user)
         if user:
             wallet_ids = user.wallet_ids
-    return [email.dict() for email in await get_emails(wallet_ids)]
+    return await get_emails(wallet_ids)
 
 
 @smtp_api_router.get("/api/v1/email/{payment_hash}")
@@ -70,31 +71,26 @@ async def api_smtp_make_email(emailaddress_id, data: CreateEmail):
             status_code=HTTPStatus.BAD_REQUEST,
             detail="Emailaddress address does not exist.",
         )
-    try:
-        memo = f"sent email from {emailaddress.email} to {data.receiver}"
-        if emailaddress.anonymize:
-            memo = "sent email"
+    memo = f"sent email from {emailaddress.email} to {data.receiver}"
+    if emailaddress.anonymize:
+        memo = "sent email"
 
-        payment_hash, payment_request = await create_invoice(
-            wallet_id=emailaddress.wallet,
-            amount=emailaddress.cost,
-            memo=memo,
-            extra={"tag": "smtp"},
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc)
-        ) from exc
+    payment = await create_invoice(
+        wallet_id=emailaddress.wallet,
+        amount=emailaddress.cost,
+        memo=memo,
+        extra={"tag": "smtp"},
+    )
 
     email = await create_email(
-        payment_hash=payment_hash, wallet=emailaddress.wallet, data=data
+        payment_hash=payment.payment_hash, wallet=emailaddress.wallet, data=data
     )
 
     if not email:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Email could not be fetched."
         )
-    return {"payment_hash": payment_hash, "payment_request": payment_request}
+    return {"payment_hash": payment.payment_hash, "payment_request": payment.bolt11}
 
 
 @smtp_api_router.post(
@@ -118,7 +114,9 @@ async def api_smtp_make_email_send(emailaddress_id, data: CreateEmail):
 
 
 @smtp_api_router.delete("/api/v1/email/{email_id}")
-async def api_email_delete(email_id, g: WalletTypeInfo = Depends(get_key_type)):
+async def api_email_delete(
+    email_id, key_info: WalletTypeInfo = Depends(require_invoice_key)
+):
     email = await get_email(email_id)
 
     if not email:
@@ -126,27 +124,23 @@ async def api_email_delete(email_id, g: WalletTypeInfo = Depends(get_key_type)):
             status_code=HTTPStatus.NOT_FOUND, detail="LNsubdomain does not exist."
         )
 
-    if email.wallet != g.wallet.id:
+    if email.wallet != key_info.wallet.id:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your email.")
 
     await delete_email(email_id)
-    raise HTTPException(status_code=HTTPStatus.NO_CONTENT)
 
 
-## EMAILADDRESSES
 @smtp_api_router.get("/api/v1/emailaddress")
 async def api_emailaddresses(
-    g: WalletTypeInfo = Depends(get_key_type),
+    key_info: WalletTypeInfo = Depends(require_invoice_key),
     all_wallets: bool = Query(False),
-):
-    wallet_ids = [g.wallet.id]
+) -> list[Emailaddress]:
+    wallet_ids = [key_info.wallet.id]
     if all_wallets:
-        user = await get_user(g.wallet.user)
+        user = await get_user(key_info.wallet.user)
         if user:
             wallet_ids = user.wallet_ids
-    return [
-        emailaddress.dict() for emailaddress in await get_emailaddresses(wallet_ids)
-    ]
+    return await get_emailaddresses(wallet_ids)
 
 
 @smtp_api_router.post("/api/v1/emailaddress")
@@ -154,8 +148,8 @@ async def api_emailaddresses(
 async def api_emailaddress_create(
     data: CreateEmailaddress,
     emailaddress_id=None,
-    g: WalletTypeInfo = Depends(get_key_type),
-):
+    key_info: WalletTypeInfo = Depends(require_invoice_key),
+) -> Emailaddress:
     if emailaddress_id:
         emailaddress = await get_emailaddress(emailaddress_id)
 
@@ -163,7 +157,7 @@ async def api_emailaddress_create(
             raise HTTPException(
                 status_code=HTTPStatus.NOT_FOUND, detail="Emailadress does not exist."
             )
-        if emailaddress.wallet != g.wallet.id:
+        if emailaddress.wallet != key_info.wallet.id:
             raise HTTPException(
                 status_code=HTTPStatus.FORBIDDEN, detail="Not your emailaddress."
             )
@@ -171,12 +165,12 @@ async def api_emailaddress_create(
         emailaddress = await update_emailaddress(emailaddress_id, **data.dict())
     else:
         emailaddress = await create_emailaddress(data=data)
-    return emailaddress.dict()
+    return emailaddress
 
 
 @smtp_api_router.delete("/api/v1/emailaddress/{emailaddress_id}")
 async def api_emailaddress_delete(
-    emailaddress_id, g: WalletTypeInfo = Depends(get_key_type)
+    emailaddress_id, key_info: WalletTypeInfo = Depends(require_invoice_key)
 ):
     emailaddress = await get_emailaddress(emailaddress_id)
 
@@ -184,10 +178,9 @@ async def api_emailaddress_delete(
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Emailaddress does not exist."
         )
-    if emailaddress.wallet != g.wallet.id:
+    if emailaddress.wallet != key_info.wallet.id:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN, detail="Not your Emailaddress."
         )
 
     await delete_emailaddress(emailaddress_id)
-    raise HTTPException(status_code=HTTPStatus.NO_CONTENT)

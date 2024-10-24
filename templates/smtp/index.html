@@ -318,14 +318,14 @@
 <script>
   const LNSendmail = obj => {
     obj.date = Quasar.date.formatDate(
-      new Date(obj.time * 1000),
+      new Date(obj.time),
       'YYYY-MM-DD HH:mm'
     )
     obj.displayUrl = ['/smtp/', obj.id].join('')
     return obj
   }
 
-  new Vue({
+  window.app = Vue.createApp({
     el: '#vue',
     mixins: [windowMixin],
     data() {

@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
@@ -26,143 +26,99 @@ async def create_emailaddress(data: CreateEmailaddress) -> Emailaddress:
     email = get_test_mail(data.email, data.testemail)
     await send_mail(data, email)
 
-    await db.execute(
-        """
-        INSERT INTO smtp.emailaddress
-        (
-            id, wallet, email, testemail, smtp_server, smtp_user, smtp_password,
-            smtp_port, anonymize, description, cost
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            emailaddress_id,
-            data.wallet,
-            data.email,
-            data.testemail,
-            data.smtp_server,
-            data.smtp_user,
-            data.smtp_password,
-            data.smtp_port,
-            data.anonymize,
-            data.description,
-            data.cost,
-        ),
+    emailaddress = Emailaddress(
+        id=emailaddress_id,
+        **data.dict(),
     )
-
-    new_emailaddress = await get_emailaddress(emailaddress_id)
-    assert new_emailaddress, "Newly created emailaddress couldn't be retrieved"
-    return new_emailaddress
+    await db.insert("smtp.emailaddress", emailaddress)
+    return emailaddress
 
 
-async def update_emailaddress(emailaddress_id: str, **kwargs) -> Emailaddress:
-    q = ", ".join([f"{field[0]} = ?" for field in kwargs.items()])
-    await db.execute(
-        f"UPDATE smtp.emailaddress SET {q} WHERE id = ?",
-        (*kwargs.values(), emailaddress_id),
-    )
-    row = await db.fetchone(
-        "SELECT * FROM smtp.emailaddress WHERE id = ?", (emailaddress_id,)
-    )
-
+async def update_emailaddress(emailaddress: Emailaddress) -> Emailaddress:
+    await db.update("smtp.emailaddress", emailaddress)
     # send test mail for checking connection
-    email = get_test_mail(row.email, row.testemail)
-    await send_mail(row, email)
-
-    assert row, "Newly updated emailaddress couldn't be retrieved"
-    return Emailaddress(**row)
+    email = get_test_mail(emailaddress.email, emailaddress.testemail)
+    await send_mail(emailaddress, email)
+    return emailaddress
 
 
 async def get_emailaddress(emailaddress_id: str) -> Optional[Emailaddress]:
-    row = await db.fetchone(
-        "SELECT * FROM smtp.emailaddress WHERE id = ?", (emailaddress_id,)
+    return await db.fetchone(
+        "SELECT * FROM smtp.emailaddress WHERE id = :id",
+        {"id": emailaddress_id},
+        Emailaddress,
     )
-    return Emailaddress(**row) if row else None
 
 
 async def get_emailaddress_by_email(email: str) -> Optional[Emailaddress]:
-    row = await db.fetchone("SELECT * FROM smtp.emailaddress WHERE email = ?", (email,))
-    return Emailaddress(**row) if row else None
-
-
-async def get_emailaddresses(wallet_ids: Union[str, List[str]]) -> List[Emailaddress]:
-    if isinstance(wallet_ids, str):
-        wallet_ids = [wallet_ids]
-
-    q = ",".join(["?"] * len(wallet_ids))
-    rows = await db.fetchall(
-        f"SELECT * FROM smtp.emailaddress WHERE wallet IN ({q})", (*wallet_ids,)
+    return await db.fetchone(
+        "SELECT * FROM smtp.emailaddress WHERE email = :email",
+        {"email": email},
+        Emailaddress,
     )
 
-    return [Emailaddress(**row) for row in rows]
+
+async def get_emailaddresses(wallet_ids: Union[str, list[str]]) -> list[Emailaddress]:
+    if isinstance(wallet_ids, str):
+        wallet_ids = [wallet_ids]
+    q = ",".join([f"'{wallet_id}'" for wallet_id in wallet_ids])
+    return await db.fetchall(
+        f"SELECT * FROM smtp.emailaddress WHERE wallet IN ({q})",
+        model=Emailaddress,
+    )
 
 
 async def delete_emailaddress(emailaddress_id: str) -> None:
-    await db.execute("DELETE FROM smtp.emailaddress WHERE id = ?", (emailaddress_id,))
+    await db.execute(
+        "DELETE FROM smtp.emailaddress WHERE id = :id", {"id": emailaddress_id}
+    )
 
 
 async def create_email(wallet: str, data: CreateEmail, payment_hash: str = "") -> Email:
     email_id = urlsafe_short_hash()
-    await db.execute(
-        """
-        INSERT INTO smtp.email
-        (id, payment_hash, wallet, emailaddress_id, subject, receiver, message, paid)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            email_id,
-            payment_hash,
-            wallet,
-            data.emailaddress_id,
-            data.subject,
-            data.receiver,
-            data.message,
-            False,
-        ),
-    )
-
-    new_email = await get_email(email_id)
-    assert new_email, "Newly created email couldn't be retrieved"
-    return new_email
+    email = Email(id=email_id, payment_hash=payment_hash, wallet=wallet, **data.dict())
+    await db.insert("smtp.email", email)
+    return email
 
 
 async def set_email_paid(payment_hash: str) -> bool:
     email = await get_email_by_payment_hash(payment_hash)
     if email and email.paid is False:
         await db.execute(
-            "UPDATE smtp.email SET paid = true WHERE payment_hash = ?", (payment_hash,)
+            "UPDATE smtp.email SET paid = true WHERE payment_hash = :payment_hash",
+            {"payment_hash": payment_hash},
         )
         return True
     return False
 
 
 async def get_email_by_payment_hash(payment_hash: str) -> Optional[Email]:
-    row = await db.fetchone(
-        "SELECT * FROM smtp.email WHERE payment_hash = ?", (payment_hash,)
+    return await db.fetchone(
+        "SELECT * FROM smtp.email WHERE payment_hash = :payment_hash",
+        {"payment_hash": payment_hash},
+        Email,
     )
-    return Email(**row) if row else None
 
 
 async def get_email(email_id: str) -> Optional[Email]:
-    row = await db.fetchone("SELECT * FROM smtp.email WHERE id = ?", (email_id,))
-    return Email(**row) if row else None
-
-
-async def get_emails(wallet_ids: Union[str, List[str]]) -> List[Email]:
-    if isinstance(wallet_ids, str):
-        wallet_ids = [wallet_ids]
-
-    q = ",".join(["?"] * len(wallet_ids))
-    rows = await db.fetchall(
-        f"""
-    SELECT s.*, d.email as emailaddress FROM smtp.email s
-    INNER JOIN smtp.emailaddress d ON (s.emailaddress_id = d.id) WHERE s.wallet IN ({q})
-    """,
-        (*wallet_ids,),
+    return await db.fetchone(
+        "SELECT * FROM smtp.email WHERE id = :id", {"id": email_id}, Email
     )
 
-    return [Email(**row) for row in rows]
+
+async def get_emails(wallet_ids: Union[str, list[str]]) -> list[Email]:
+    if isinstance(wallet_ids, str):
+        wallet_ids = [wallet_ids]
+    q = ",".join([f"'{wallet_id}'" for wallet_id in wallet_ids])
+    return await db.fetchall(
+        f"""
+        SELECT s.*, d.email as emailaddress FROM smtp.email s
+        INNER JOIN smtp.emailaddress d ON (s.emailaddress_id = d.id)
+        WHERE s.wallet IN ({q})
+        """,
+        model=Email,
+    )
 
 
 async def delete_email(email_id: str) -> None:
-    await db.execute("DELETE FROM smtp.email WHERE id = ?", (email_id,))
+    await db.execute("DELETE FROM smtp.email WHERE id = :id", {"id": email_id})

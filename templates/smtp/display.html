@@ -7,7 +7,7 @@
         <br />
         <h5 class="q-my-none">{{ desc }}</h5>
         <br />
-        <q-form @submit="Invoice()" class="q-gutter-md">
+        <q-form @submit="submitInvoice()" class="q-gutter-md">
           <q-input
             filled
             dense
@@ -74,10 +74,7 @@
 
 {% endblock %} {% block scripts %}
 <script>
-  console.log('{{ cost }}')
-  Vue.component(VueQrcode.name, VueQrcode)
-
-  new Vue({
+  window.app = Vue.createApp({
     el: '#vue',
     mixins: [windowMixin],
     data: function () {
@@ -101,73 +98,62 @@
     },
 
     methods: {
-      closeReceiveDialog: function () {
-        var checker = this.receive.paymentChecker
+      closeReceiveDialog() {
+        const checker = this.receive.paymentChecker
         dismissMsg()
 
         clearInterval(paymentChecker)
         setTimeout(function () {}, 10000)
       },
-      Invoice: function () {
-        var self = this
+      submitInvoice() {
         axios
           .post('/smtp/api/v1/email/{{ emailaddress_id }}', {
             emailaddress_id: '{{ emailaddress_id }}',
-            subject: self.formDialog.data.subject,
-            receiver: self.formDialog.data.receiver,
-            message: self.formDialog.data.message
+            subject: this.formDialog.data.subject,
+            receiver: this.formDialog.data.receiver,
+            message: this.formDialog.data.message
           })
-          .then(function (response) {
-            self.paymentReq = response.data.payment_request
-            self.paymentCheck = response.data.payment_hash
+          .then(response => {
+            this.paymentReq = response.data.payment_request
+            this.paymentCheck = response.data.payment_hash
 
-            dismissMsg = self.$q.notify({
+            dismissMsg = Quasar.Notify.create({
               timeout: 0,
               message: 'Waiting for payment...'
             })
 
-            self.receive = {
+            this.receive = {
               show: true,
               status: 'pending',
-              paymentReq: self.paymentReq
+              paymentReq: this.paymentReq
             }
 
-            paymentChecker = setInterval(function () {
+            paymentChecker = setInterval(() => {
               axios
-                .get('/smtp/api/v1/email/' + self.paymentCheck)
-                .then(function (res) {
-                  console.log(res.data)
+                .get('/smtp/api/v1/email/' + this.paymentCheck)
+                .then(res => {
                   if (res.data.paid) {
                     clearInterval(paymentChecker)
-                    self.receive = {
+                    this.receive = {
                       show: false,
                       status: 'complete',
                       paymentReq: null
                     }
                     dismissMsg()
-
-                    console.log(self.formDialog)
-                    self.formDialog.data.subject = ''
-                    self.formDialog.data.receiver = ''
-                    self.formDialog.data.message = ''
-                    self.$q.notify({
+                    this.formDialog.data.subject = ''
+                    this.formDialog.data.receiver = ''
+                    this.formDialog.data.message = ''
+                    Quasar.Notify.create({
                       type: 'positive',
                       message: 'Sent, thank you!',
                       icon: 'thumb_up'
                     })
-                    console.log('END')
                   }
                 })
-                .catch(function (error) {
-                  console.log(error)
-                  LNbits.utils.notifyApiError(error)
-                })
+                .catch(Nbits.utils.notifyApiError)
             }, 2000)
           })
-          .catch(function (error) {
-            console.log(error)
-            LNbits.utils.notifyApiError(error)
-          })
+          .catch(LNbits.utils.notifyApiError)
       }
     }
   })

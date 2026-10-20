@@ -28,7 +28,7 @@ async def create_emailaddress(data: CreateEmailaddress) -> Emailaddress:
 
     emailaddress = Emailaddress(
         id=emailaddress_id,
-        **data.dict(),
+        **data.model_dump(),
     )
     await db.insert("smtp.emailaddress", emailaddress)
     return emailaddress
@@ -76,7 +76,9 @@ async def delete_emailaddress(emailaddress_id: str) -> None:
 
 async def create_email(wallet: str, data: CreateEmail, payment_hash: str = "") -> Email:
     email_id = urlsafe_short_hash()
-    email = Email(id=email_id, payment_hash=payment_hash, wallet=wallet, **data.dict())
+    email = Email(
+        id=email_id, payment_hash=payment_hash, wallet=wallet, **data.model_dump()
+    )
     await db.insert("smtp.email", email)
     return email
 

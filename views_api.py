@@ -162,7 +162,7 @@ async def api_emailaddress_create(
                 status_code=HTTPStatus.FORBIDDEN, detail="Not your emailaddress."
             )
 
-        emailaddress = await update_emailaddress(emailaddress_id, **data.dict())
+        emailaddress = await update_emailaddress(emailaddress_id, **data.model_dump())
     else:
         emailaddress = await create_emailaddress(data=data)
     return emailaddress

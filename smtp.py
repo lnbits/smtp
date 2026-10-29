@@ -4,7 +4,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate
 from smtplib import SMTP_SSL as SMTP
-from typing import Union
 
 from loguru import logger
 
@@ -12,8 +11,8 @@ from .models import CreateEmail, CreateEmailaddress, Email, Emailaddress
 
 
 async def send_mail(
-    emailaddress: Union[Emailaddress, CreateEmailaddress],
-    email: Union[Email, CreateEmail],
+    emailaddress: Emailaddress | CreateEmailaddress,
+    email: Email | CreateEmail,
 ):
     smtp_client = SmtpService(emailaddress)
     message = smtp_client.create_message(email)
@@ -34,14 +33,14 @@ def valid_email(s):
 
 
 class SmtpService:
-    def __init__(self, emailaddress: Union[Emailaddress, CreateEmailaddress]) -> None:
+    def __init__(self, emailaddress: Emailaddress | CreateEmailaddress) -> None:
         self.sender = emailaddress.email
         self.smtp_server = emailaddress.smtp_server
         self.smtp_port = emailaddress.smtp_port
         self.smtp_user = emailaddress.smtp_user
         self.smtp_password = emailaddress.smtp_password
 
-    def render_email(self, email: Union[Email, CreateEmail]):
+    def render_email(self, email: Email | CreateEmail):
         signature: str = "Email sent by LNbits SMTP extension."
         text = f"{email.message}\n\n{signature}"
         html = (
@@ -61,7 +60,7 @@ class SmtpService:
         )
         return text, html
 
-    def create_message(self, email: Union[Email, CreateEmail]):
+    def create_message(self, email: Email | CreateEmail):
         ts = time.time()
         date = formatdate(ts, True)
 

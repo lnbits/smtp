@@ -1,5 +1,3 @@
-from typing import Optional, Union
-
 from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
 
@@ -28,7 +26,7 @@ async def create_emailaddress(data: CreateEmailaddress) -> Emailaddress:
 
     emailaddress = Emailaddress(
         id=emailaddress_id,
-        **data.dict(),
+        **data.model_dump(),
     )
     await db.insert("smtp.emailaddress", emailaddress)
     return emailaddress
@@ -42,7 +40,7 @@ async def update_emailaddress(emailaddress: Emailaddress) -> Emailaddress:
     return emailaddress
 
 
-async def get_emailaddress(emailaddress_id: str) -> Optional[Emailaddress]:
+async def get_emailaddress(emailaddress_id: str) -> Emailaddress | None:
     return await db.fetchone(
         "SELECT * FROM smtp.emailaddress WHERE id = :id",
         {"id": emailaddress_id},
@@ -50,7 +48,7 @@ async def get_emailaddress(emailaddress_id: str) -> Optional[Emailaddress]:
     )
 
 
-async def get_emailaddress_by_email(email: str) -> Optional[Emailaddress]:
+async def get_emailaddress_by_email(email: str) -> Emailaddress | None:
     return await db.fetchone(
         "SELECT * FROM smtp.emailaddress WHERE email = :email",
         {"email": email},
@@ -58,7 +56,7 @@ async def get_emailaddress_by_email(email: str) -> Optional[Emailaddress]:
     )
 
 
-async def get_emailaddresses(wallet_ids: Union[str, list[str]]) -> list[Emailaddress]:
+async def get_emailaddresses(wallet_ids: str | list[str]) -> list[Emailaddress]:
     if isinstance(wallet_ids, str):
         wallet_ids = [wallet_ids]
     q = ",".join([f"'{wallet_id}'" for wallet_id in wallet_ids])
@@ -76,7 +74,9 @@ async def delete_emailaddress(emailaddress_id: str) -> None:
 
 async def create_email(wallet: str, data: CreateEmail, payment_hash: str = "") -> Email:
     email_id = urlsafe_short_hash()
-    email = Email(id=email_id, payment_hash=payment_hash, wallet=wallet, **data.dict())
+    email = Email(
+        id=email_id, payment_hash=payment_hash, wallet=wallet, **data.model_dump()
+    )
     await db.insert("smtp.email", email)
     return email
 
@@ -92,7 +92,7 @@ async def set_email_paid(payment_hash: str) -> bool:
     return False
 
 
-async def get_email_by_payment_hash(payment_hash: str) -> Optional[Email]:
+async def get_email_by_payment_hash(payment_hash: str) -> Email | None:
     return await db.fetchone(
         "SELECT * FROM smtp.email WHERE payment_hash = :payment_hash",
         {"payment_hash": payment_hash},
@@ -100,13 +100,13 @@ async def get_email_by_payment_hash(payment_hash: str) -> Optional[Email]:
     )
 
 
-async def get_email(email_id: str) -> Optional[Email]:
+async def get_email(email_id: str) -> Email | None:
     return await db.fetchone(
         "SELECT * FROM smtp.email WHERE id = :id", {"id": email_id}, Email
     )
 
 
-async def get_emails(wallet_ids: Union[str, list[str]]) -> list[Email]:
+async def get_emails(wallet_ids: str | list[str]) -> list[Email]:
     if isinstance(wallet_ids, str):
         wallet_ids = [wallet_ids]
     q = ",".join([f"'{wallet_id}'" for wallet_id in wallet_ids])
